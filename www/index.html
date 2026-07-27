@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title> NiftySenseAI Pro – Live NIFTY & SENSEX Signals</title>
+  <link rel="stylesheet" href="style.css" />
+<script src="https://s3.tradingview.com/tv.js"></script>
+</head>
+<body>
+  <div class="app">
+
+    <header class="header">
+      <h1>NiftySenseAI <span class="pro">Pro</span></h1>
+      <p>Live AI Prediction • NIFTY 50 + SENSEX</p>
+    </header>
+
+    <div class="symbol-switch">
+      <button class="symbol-btn active" data-symbol="SENSEX" id="symbolSensexBtn">SENSEX</button>
+      <button class="symbol-btn" data-symbol="NIFTY" id="symbolNiftyBtn">NIFTY 50</button>
+    </div>
+
+    <section class="price-card">
+      <div class="price-top">
+        <div>
+          <div class="label" id="symbolLabel">SENSEX</div>
+          <div class="live-price" id="livePrice">Loading...</div>
+          <div class="price-change" id="priceChange">--</div>
+        </div>
+        <div class="market-badge" id="marketStatus"><span>--</span></div>
+      </div>
+      <div class="meta-row">
+        <div class="meta">
+          <span class="meta-label">Last Updated</span>
+          <span id="lastUpdated">--</span>
+        </div>
+        <div class="meta">
+          <span class="meta-label">Horizon</span>
+          <span id="predictionTime">15 Min</span>
+        </div>
+      </div>
+    </section>
+
+    <div id="loadingState" class="state-banner loading" style="display:none;">
+      ⏳ Fetching live data...
+    </div>
+    <div id="errorState" class="state-banner error" style="display:none;">
+      <span id="errorText">Error loading data</span>
+      <button id="retryBtn" class="retry-btn">Retry</button>
+    </div>
+    <div id="marketClosedMessage" class="state-banner closed" style="display:none;">
+      🔒 Market Closed — Showing last available data
+    </div>
+
+    <section class="chart-card">
+      <div id="tvChart" class="tv-chart"></div>
+      <div id="tvFallback" class="tv-fallback" style="display:none;">
+        <p>TradingView failed to load</p>
+        <button id="tvRetryBtn" class="retry-btn">Retry Chart</button>
+      </div>
+    </section>
+
+    <section class="signal-card">
+      <div class="signal-header">
+        <div class="trend" id="trend">⏳ Loading...</div>
+        <div class="confidence">Confidence: <span id="confidence">--</span></div>
+      </div>
+
+      <div class="levels-grid">
+        <div class="level">
+          <span class="level-label">Entry</span>
+          <span id="entry">--</span>
+        </div>
+        <div class="level">
+          <span class="level-label">Target 1</span>
+          <span id="target1" class="green">--</span>
+        </div>
+        <div class="level">
+          <span class="level-label">Target 2</span>
+          <span id="target2" class="green">--</span>
+        </div>
+        <div class="level">
+          <span class="level-label">Stop Loss</span>
+          <span id="stoploss" class="red">--</span>
+        </div>
+      </div>
+
+      <div class="action-area">
+        <button id="buyBtn" class="action-btn buy" style="display:none;">🟢 BUY</button>
+        <button id="sellBtn" class="action-btn sell" style="display:none;">🔴 SELL</button>
+<div id="waitMessage" class="wait-msg">🟡 WAIT — Waiting for AI confirmation...</div>
+      </div>
+    </section>
+
+    <section class="indicators-card">
+      <h3>AI Analysis</h3>
+      <div class="ind-list">
+        <div class="ind-row"><span class="ind-label">AI Reason</span><span id="aiReason">--</span></div>
+        <div class="ind-row"><span class="ind-label">VWAP</span><span id="vwap">--</span></div>
+        <div class="ind-row"><span class="ind-label">ADX</span><span id="adx">--</span></div>
+        <div class="ind-row"><span class="ind-label">Trend Strength</span><span id="trendStrength">--</span></div>
+        <div class="ind-row"><span class="ind-label">Support</span><span id="support">--</span></div>
+        <div class="ind-row"><span class="ind-label">Resistance</span><span id="resistance">--</span></div>
+        <div class="ind-row"><span class="ind-label">Candle Pattern</span><span id="candlePattern">--</span></div>
+        <div class="ind-row"><span class="ind-label">Risk Level</span><span id="riskLevel">--</span></div>
+        <div class="ind-row"><span class="ind-label">Risk : Reward</span><span id="riskReward">--</span></div>
+      </div>
+    </section>
+
+    <section class="history-card">
+      <h3>Prediction History (Last 5)</h3>
+      <div id="predictionHistory" class="history-list">
+        <div class="empty-history">No signals yet</div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>Data: Yahoo Finance • Chart: TradingView</p>
+      <p class="version">NiftySenseAI Pro v1.0 • Not financial advice</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

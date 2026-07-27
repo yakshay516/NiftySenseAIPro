@@ -1,0 +1,274 @@
+:root {
+  --bg: #0b0f17;
+  --card: #111827;
+  --border: #1f2937;
+  --text: #ffffff;
+  --muted: #9ca3af;
+  --green: #00ff66;
+  --red: #ff3b30;
+  --yellow: #ffd54f;
+  --blue: #00bfff;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 15px 14px 40px;
+}
+
+/* Header */
+.header { text-align: center; margin-bottom: 14px; }
+.header h1 { color: var(--green); font-size: 26px; font-weight: 700; }
+.header .pro { color: var(--blue); }
+.header p { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+/* Symbol Switch */
+.symbol-switch {
+  display: flex;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 14px;
+}
+.symbol-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.symbol-btn.active {
+  background: #1a73e8;
+  color: #fff;
+}
+
+/* Price Card */
+.price-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.price-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.label { font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+.live-price {
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--green);
+  line-height: 1.1;
+}
+.price-change { font-size: 13px; margin-top: 4px; color: var(--muted); }
+.price-change.up { color: var(--green); }
+.price-change.down { color: var(--red); }
+.price-change.closed { color: var(--yellow); }
+
+.market-badge {
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.meta-label { display: block; font-size: 11px; color: var(--muted); }
+#lastUpdated, #predictionTime { font-size: 13px; font-weight: 600; }
+
+/* State Banners */
+.state-banner {
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  text-align: center;
+  font-size: 14px;
+}
+.state-banner.loading {
+  background: rgba(0,191,255,0.12);
+  border: 1px solid rgba(0,191,255,0.3);
+  color: var(--blue);
+}
+.state-banner.error {
+  background: rgba(255,59,48,0.12);
+  border: 1px solid rgba(255,59,48,0.35);
+  color: var(--red);
+}
+.state-banner.closed {
+  background: rgba(255,213,79,0.1);
+  border: 1px solid rgba(255,213,79,0.3);
+  color: var(--yellow);
+}
+.retry-btn {
+  margin-left: 8px;
+  background: var(--red);
+  color: #fff;
+  border: none;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* Chart */
+.chart-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.tv-chart { width: 100%; height: 380px; }
+.tv-fallback {
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+}
+
+/* Signal Card */
+.signal-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.signal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.trend { font-size: 18px; font-weight: 700; }
+.confidence { font-size: 13px; color: var(--muted); }
+.confidence span { color: var(--text); font-weight: 600; }
+
+.levels-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.level {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+}
+.level-label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.level span:last-child { font-size: 15px; font-weight: 600; }
+.green { color: var(--green); }
+.red { color: var(--red); }
+
+.action-btn {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.action-btn.buy {
+  background: linear-gradient(135deg, #00b140, #00ff66);
+  color: #003d1a;
+}
+.action-btn.sell {
+  background: linear-gradient(135deg, #d62828, #ff3b30);
+  color: #fff;
+}
+.wait-msg {
+  text-align: center;
+  padding: 14px;
+  background: rgba(255,213,79,0.1);
+  border: 1px solid rgba(255,213,79,0.3);
+  border-radius: 12px;
+  color: var(--yellow);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+/* Indicators */
+.indicators-card, .history-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.indicators-card h3, .history-card h3 {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.ind-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  gap: 10px;
+}
+.ind-row:last-child { border-bottom: none; }
+.ind-label { color: var(--muted); flex-shrink: 0; }
+.ind-row span:last-child { text-align: right; font-weight: 500; word-break: break-word; }
+
+/* History */
+.history-list { display: flex; flex-direction: column; gap: 8px; }
+.history-list div {
+  padding: 9px 11px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  font-size: 13px;
+  border-left: 3px solid var(--border);
+}
+.empty-history { color: var(--muted); text-align: center; padding: 12px; }
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 16px 0 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.footer .version { margin-top: 4px; opacity: 0.7; }
+
+/* Mobile */
+@media (max-width: 380px) {
+  .live-price { font-size: 26px; }
+  .header h1 { font-size: 22px; }
+  .tv-chart { height: 320px; }
+}

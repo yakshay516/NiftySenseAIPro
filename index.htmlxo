@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NiftySenseAI Pro</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+    <h1>NiftySenseAI Pro</h1>
+    <p>AI Powered NIFTY 50 &amp; SENSEX Market Analysis</p>
+</header>
+
+<div class="container">
+
+    <div class="status">
+        <h2>Market Status</h2>
+        <p id="marketStatus">Loading...</p>
+        <p id="lastUpdate">Waiting...</p>
+    </div>
+
+    <div class="card">
+        <h2>NIFTY 50</h2>
+
+        <h3 id="niftyPrice">Loading...</h3>
+
+        <canvas id="niftyChart" class="chart"></canvas>
+
+        <p id="niftyAnalysis">AI Analysis : Waiting...</p>
+        <p id="niftyPrediction">Prediction : Waiting...</p>
+        <p id="niftySignal">Signal : Waiting...</p>
+        <p id="niftyConfidence">Confidence : 0%</p>
+        <p id="niftyEntry">Entry : --</p>
+        <p id="niftySL">Stop Loss : --</p>
+        <p id="niftyTarget">Target : --</p>
+    </div>
+
+    <div class="card">
+        <h2>SENSEX</h2>
+
+        <h3 id="sensexPrice">Loading...</h3>
+
+        <canvas id="sensexChart" class="chart"></canvas>
+
+        <p id="sensexAnalysis">AI Analysis : Waiting...</p>
+        <p id="sensexPrediction">Prediction : Waiting...</p>
+        <p id="sensexSignal">Signal : Waiting...</p>
+        <p id="sensexConfidence">Confidence : 0%</p>
+        <p id="sensexEntry">Entry : --</p>
+        <p id="sensexSL">Stop Loss : --</p>
+        <p id="sensexTarget">Target : --</p>
+    </div>
+<div class="card">
+    <h2>AI Quick View</h2>
+
+    <p id="next15Min">⬆️ Next 15 Min : Waiting...</p>
+
+    <p id="marketTrend">📈 Market Trend : Waiting...</p>
+
+    <p id="riskLevel">🟢 Risk : Waiting...</p>
+
+    <p id="aiAction">🤖 AI Action : Waiting...</p>
+
+    <p id="accuracy">🎯 AI Accuracy : Waiting...</p>
+
+    <p id="refreshTime">🔄 Refresh : Waiting...</p>
+</div>
+
+    <div class="card">
+        <h2>AI Market Summary</h2>
+
+        <p id="marketSummary">
+            Waiting for AI Analysis...
+        </p>
+    </div>
+
+</div>
+
+<footer>
+    <h3>NiftySenseAI Pro</h3>
+    <p>AI Powered Market Analysis</p>
+</footer>
+
+<script src="script.js"></script>
+
+</body>
+
+</html>
