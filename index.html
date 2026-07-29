@@ -86,11 +86,62 @@
       </div>
 
       <div class="action-area">
-        <button id="buyBtn" class="action-btn buy" style="display:none;">🟢 BUY</button>
-        <button id="sellBtn" class="action-btn sell" style="display:none;">🔴 SELL</button>
+        <button id="buyBtn" class="action-btn buy" style="display:none;">🟢 AI: BUY</button>
+        <button id="sellBtn" class="action-btn sell" style="display:none;">🔴 AI: SELL</button>
 <div id="waitMessage" class="wait-msg">🟡 WAIT — Waiting for AI confirmation...</div>
       </div>
     </section>
+
+    <!-- ===================== DEMO TRADING ACCOUNT (Phase 1) ===================== -->
+    <section class="demo-card">
+      <div class="demo-header">
+        <h3>Demo Trading Account</h3>
+        <button id="resetDemoBtn" class="reset-btn" title="Reset Demo Account">↺ Reset</button>
+      </div>
+
+      <div class="balance-row">
+        <div class="balance-box">
+          <span class="balance-label">Virtual Balance</span>
+          <span id="demoBalance" class="balance-value">₹1,00,000.00</span>
+        </div>
+        <div class="balance-box">
+          <span class="balance-label">Total P&amp;L</span>
+          <span id="demoTotalPL" class="balance-value">₹0.00</span>
+        </div>
+      </div>
+
+      <div id="demoPositionBox" class="position-box" style="display:none;">
+        <div class="position-row">
+          <span class="pos-type" id="posType">BUY</span>
+          <span class="pos-symbol" id="posSymbol">SENSEX</span>
+        </div>
+        <div class="position-details">
+          <div><span>Entry</span><span id="posEntry">--</span></div>
+          <div><span>Qty</span><span id="posQty">--</span></div>
+          <div><span>Current</span><span id="posCurrent">--</span></div>
+          <div><span>P&amp;L</span><span id="posPL">--</span></div>
+        </div>
+      </div>
+
+      <div class="qty-row">
+        <label for="demoQty">Quantity</label>
+        <input type="number" id="demoQty" min="1" step="1" value="1" />
+      </div>
+
+      <div class="demo-actions">
+        <button id="demoBuyBtn" class="demo-btn buy">BUY</button>
+        <button id="demoSellBtn" class="demo-btn sell">SELL</button>
+        <button id="demoExitBtn" class="demo-btn exit" disabled>EXIT</button>
+      </div>
+    </section>
+
+    <section class="trade-history-card">
+      <h3>Trade History</h3>
+      <div id="tradeHistoryList" class="trade-history-list">
+        <div class="empty-history">No trades yet</div>
+      </div>
+    </section>
+    <!-- =================== END DEMO TRADING ACCOUNT (Phase 1) =================== -->
 
     <section class="indicators-card">
       <h3>AI Analysis</h3>
@@ -116,7 +167,7 @@
 
     <footer class="footer">
       <p>Data: Yahoo Finance • Chart: TradingView</p>
-      <p class="version">NiftySenseAI Pro v1.0 • Not financial advice</p>
+      <p class="version">NiftySenseAI Pro v1.1 • Not financial advice</p>
     </footer>
   </div>
 

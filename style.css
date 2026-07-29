@@ -221,6 +221,182 @@ body {
   font-size: 15px;
 }
 
+/* ===================== Demo Trading Account (Phase 1) ===================== */
+.demo-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.demo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.demo-header h3 { font-size: 14px; color: var(--muted); }
+.reset-btn {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.reset-btn:active { opacity: 0.7; }
+
+.balance-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.balance-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+}
+.balance-label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.balance-value { font-size: 17px; font-weight: 700; }
+.balance-value.green { color: var(--green); }
+.balance-value.red { color: var(--red); }
+
+.position-box {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+.position-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.pos-type {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+.pos-type.buy { background: rgba(0,255,102,0.15); color: var(--green); }
+.pos-type.sell { background: rgba(255,59,48,0.15); color: var(--red); }
+.pos-symbol { font-size: 13px; color: var(--muted); font-weight: 600; }
+
+.position-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  font-size: 13px;
+}
+.position-details div {
+  display: flex;
+  justify-content: space-between;
+}
+.position-details span:first-child { color: var(--muted); }
+.position-details span:last-child { font-weight: 600; }
+.position-details .green { color: var(--green); }
+.position-details .red { color: var(--red); }
+
+.qty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.qty-row input {
+  width: 90px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  text-align: center;
+}
+.qty-row input:disabled { opacity: 0.5; }
+
+.demo-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+.demo-btn {
+  padding: 12px 6px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.demo-btn.buy { background: linear-gradient(135deg, #00b140, #00ff66); color: #003d1a; }
+.demo-btn.sell { background: linear-gradient(135deg, #d62828, #ff3b30); color: #fff; }
+.demo-btn.exit { background: rgba(255,255,255,0.1); color: var(--text); border: 1px solid var(--border); }
+.demo-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Trade History Card */
+.trade-history-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.trade-history-card h3 { font-size: 14px; color: var(--muted); margin-bottom: 12px; }
+.trade-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.trade-row {
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  padding: 9px 11px;
+  border-left: 3px solid var(--border);
+  font-size: 12px;
+}
+.trade-row.green { border-left-color: var(--green); }
+.trade-row.red { border-left-color: var(--red); }
+.trade-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.trade-type {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+.trade-type.buy { background: rgba(0,255,102,0.15); color: var(--green); }
+.trade-type.sell { background: rgba(255,59,48,0.15); color: var(--red); }
+.trade-symbol { color: var(--muted); font-weight: 600; }
+.trade-time { color: var(--muted); font-size: 11px; }
+.trade-row-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+}
+.trade-pl { font-weight: 700; }
+.trade-pl.green { color: var(--green); }
+.trade-pl.red { color: var(--red); }
+/* =================== End Demo Trading Account (Phase 1) =================== */
+
 /* Indicators */
 .indicators-card, .history-card {
   background: var(--card);
@@ -271,4 +447,6 @@ body {
   .live-price { font-size: 26px; }
   .header h1 { font-size: 22px; }
   .tv-chart { height: 320px; }
+  .demo-actions { grid-template-columns: 1fr 1fr; }
+  .demo-actions .demo-btn.exit { grid-column: span 2; }
 }

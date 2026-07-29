@@ -1,7 +1,8 @@
 // ======================================
-// NiftySenseAI Pro v1.0
+// NiftySenseAI Pro v1.1
 // Live Data + Confirmation AI Engine
 // NIFTY 50 + SENSEX
+// Phase 1: Demo Trading System
 // ======================================
 
 const SYMBOLS = {
@@ -12,7 +13,7 @@ const SYMBOLS = {
   },
   NIFTY: {
     yahooCode: "%5ENSEI",
-tvSymbol: "NSE:NIFTY",
+    tvSymbol: "NSE:NIFTY",
     label: "NIFTY 50"
   }
 };
@@ -21,10 +22,21 @@ let currentSymbol = "SENSEX";
 let candleHistory = [];
 let lastGoodCandles = [];
 let lastGoodPrice = null;
+let currentLivePrice = null;
 let predictionHistory = [];
 let lastAlertedDecision = null;
 let refreshTimer = null;
 let isLoading = false;
+
+// ---------- Demo Trading Account (Phase 1) ----------
+const DEMO_STORAGE_KEY = "niftysense_demo_account_v1";
+const DEMO_STARTING_BALANCE = 100000;
+
+let demoAccount = {
+  balance: DEMO_STARTING_BALANCE,
+  position: null,       // { symbol, type: "BUY"|"SELL", entryPrice, qty, entryTime }
+  tradeHistory: []       // { time, symbol, type, entryPrice, exitPrice, qty, pl }
+};
 
 // ---------- DOM Elements ----------
 const els = {
@@ -60,7 +72,24 @@ const els = {
   resistance: document.getElementById("resistance"),
   candlePattern: document.getElementById("candlePattern"),
   riskLevel: document.getElementById("riskLevel"),
-  riskReward: document.getElementById("riskReward")
+  riskReward: document.getElementById("riskReward"),
+
+  // Demo Trading Account
+  demoBalance: document.getElementById("demoBalance"),
+  demoTotalPL: document.getElementById("demoTotalPL"),
+  demoPositionBox: document.getElementById("demoPositionBox"),
+  posType: document.getElementById("posType"),
+  posSymbol: document.getElementById("posSymbol"),
+  posEntry: document.getElementById("posEntry"),
+  posQty: document.getElementById("posQty"),
+  posCurrent: document.getElementById("posCurrent"),
+  posPL: document.getElementById("posPL"),
+  demoQty: document.getElementById("demoQty"),
+  demoBuyBtn: document.getElementById("demoBuyBtn"),
+  demoSellBtn: document.getElementById("demoSellBtn"),
+  demoExitBtn: document.getElementById("demoExitBtn"),
+  resetDemoBtn: document.getElementById("resetDemoBtn"),
+  tradeHistoryList: document.getElementById("tradeHistoryList")
 };
 
 // ---------- Helpers ----------
@@ -78,6 +107,22 @@ function fmt(num) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
+}
+
+function fmtMoney(num, showSign) {
+  if (num == null || isNaN(num)) return "--";
+  const sign = showSign ? (num > 0 ? "+" : num < 0 ? "-" : "") : (num < 0 ? "-" : "");
+  const abs = Math.abs(num);
+  return sign + "₹" + abs.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function plClass(num) {
+  if (num > 0) return "green";
+  if (num < 0) return "red";
+  return "";
 }
 
 function getApiUrl() {
@@ -133,11 +178,11 @@ function calcMACDHistogram(closes) {
   const macdLine = closes
     .map((_, i) => (ema12[i] != null && ema26[i] != null) ? ema12[i] - ema26[i] : null)
     .filter(v => v != null);
-  if (macdLine.length < 9) return 0;
+  if (macdLine.length < 9) return null; // not enough data yet — stay neutral, don't guess
   const signal = ema(macdLine, 9);
   const macd = macdLine[macdLine.length - 1];
   const sig = signal[signal.length - 1];
-  return sig == null ? 0 : macd - sig;
+  return sig == null ? null : macd - sig;
 }
 
 function calcATR(highs, lows, closes, period = 14) {
@@ -296,99 +341,196 @@ function computeSignal(candles) {
   const { support, resistance } = findSupportResistance(candles);
   const pattern = detectCandlePattern(candles);
 
- let buyScore = 0;
-let sellScore = 0;
+  let buyScore = 0;
+  let sellScore = 0;
 
-if (ema9 != null && ema21 != null) {
-  if (ema9 > ema21) buyScore += 25;
-  else sellScore += 25;
-}
+  // EMA
+  if (ema9 != null && ema21 != null) {
+    if (ema9 > ema21) buyScore += 25;
+    else sellScore += 25;
+  }
 
-if (rsi != null) {
-  if (rsi >= 55 && rsi <= 70) buyScore += 20;
-  else if (rsi <= 45) sellScore += 20;
-}
+  // RSI
+  if (rsi != null) {
+    if (rsi >= 52 && rsi <= 72) buyScore += 20;
+    else if (rsi <= 48) sellScore += 20;
+  }
 
-if (hist > 0) buyScore += 25;
-else sellScore += 25;
+  // MACD
+  if (hist != null) {
+    if (hist > 0) buyScore += 25;
+    else sellScore += 25;
+  }
 
-if (vwap != null) {
-  if (price > vwap) buyScore += 20;
-  else sellScore += 20;
-}
+  // VWAP
+  if (vwap != null) {
+    if (price > vwap) buyScore += 20;
+    else sellScore += 20;
+  }
 
-if (pattern.bias === 1) buyScore += 10;
-else if (pattern.bias === -1) sellScore += 10;
+  // Candle Pattern
+  if (pattern.bias === 1) buyScore += 10;
+  else if (pattern.bias === -1) sellScore += 10;
 
-let decision = "WAIT";
+  // ---------- Final Decision (Phase 1: improved WAIT logic) ----------
+  // WAIT should only appear when the market genuinely lacks a clear edge —
+  // not just because one minor filter didn't align. Thresholds relaxed vs v1.0.
+  let decision = "WAIT";
 
-if (adx != null && adx >= 30) {
-  if (buyScore >= 80) decision = "BUY";
-  else if (sellScore >= 80) decision = "SELL";
-}
+  // ADX gate: only block on a *confirmed* directionless market (adx known & low).
+  // If ADX is unavailable yet (early data), don't force WAIT purely on that.
+  const adxOk = adx == null || adx >= 10;
 
-  const buffer = (atr || price * 0.002) * 0.5;
-  if (decision === "BUY" && resistance != null && (resistance - price) < buffer) decision = "WAIT";
-  if (decision === "SELL" && support != null && (price - support) < buffer) decision = "WAIT";
-  if (decision === "BUY" && pattern.bias === -1) decision = "WAIT";
-  if (decision === "SELL" && pattern.bias === 1) decision = "WAIT";
+  if (adxOk) {
+    if (buyScore >= 55) decision = "BUY";
+    else if (sellScore >= 55) decision = "SELL";
+  }
 
+  // Support / Resistance Filter — avoid entries right against a wall.
+  // Buffer tightened (was 0.5x ATR, now 0.3x) so it only blocks true edge cases.
+  const buffer = (atr || price * 0.002) * 0.3;
+
+  if (
+    decision === "BUY" &&
+    resistance != null &&
+    (resistance - price) < buffer
+  ) {
+    decision = "WAIT";
+  }
+
+  if (
+    decision === "SELL" &&
+    support != null &&
+    (price - support) < buffer
+  ) {
+    decision = "WAIT";
+  }
+
+  // Targets
   const bullish = decision === "BUY";
   const atrVal = atr || price * 0.003;
+
   const entryLow = Math.round(price - atrVal * 0.1);
   const entryHigh = Math.round(price + atrVal * 0.1);
-  const t1 = Math.round(bullish ? price + atrVal * 1.5 : price - atrVal * 1.5);
-  const t2 = Math.round(bullish ? price + atrVal * 2.5 : price - atrVal * 2.5);
-  const sl = Math.round(bullish ? price - atrVal * 1.0 : price + atrVal * 1.0);
 
-  const risk = Math.abs(price - sl);
-  const reward = Math.abs(t1 - price);
-  const rr = risk === 0 ? "N/A" : `1:${(reward / risk).toFixed(1)}`;
+  const target1 = Math.round(
+    bullish ? price + atrVal * 1.5 : price - atrVal * 1.5
+  );
 
+  const target2 = Math.round(
+    bullish ? price + atrVal * 2.5 : price - atrVal * 2.5
+  );
+
+  const stoploss = Math.round(
+    bullish ? price - atrVal : price + atrVal
+  );
+
+  // Risk Reward
+  const risk = Math.abs(price - stoploss);
+  const reward = Math.abs(target1 - price);
+
+  const riskReward =
+    risk === 0 ? "N/A" : `1:${(reward / risk).toFixed(1)}`;
+
+  // Risk Level
   const atrPct = (atrVal / price) * 100;
-  let riskLevel = "Unknown";
-  if (atrPct < 0.15) riskLevel = "Low";
-  else if (atrPct < 0.35) riskLevel = "Medium";
-  else riskLevel = "High";
 
+  let riskLevel = "Low";
+  if (atrPct >= 0.35) riskLevel = "High";
+  else if (atrPct >= 0.15) riskLevel = "Medium";
+
+  // Trend Strength
   let strength = "Unknown";
+
   if (adx != null) {
     if (adx < 20) strength = "Weak";
     else if (adx < 40) strength = "Moderate";
     else strength = "Strong";
   }
 
-const conf =
-  decision === "BUY"
-    ? Math.min(99, buyScore + Math.max(0, (adx || 0) - 20) / 2)
-    : decision === "SELL"
-    ? Math.min(99, sellScore + Math.max(0, (adx || 0) - 20) / 2)
-    : Math.min(49, 20 + ((adx || 0) / 3));
+  // Confidence
+  let confidence;
 
+  if (decision === "BUY") {
+    confidence = Math.min(
+      99,
+      buyScore + Math.max(0, (adx || 0) - 20) / 2
+    );
+  } else if (decision === "SELL") {
+    confidence = Math.min(
+      99,
+      sellScore + Math.max(0, (adx || 0) - 20) / 2
+    );
+  } else {
+    confidence = Math.min(
+      49,
+      20 + ((adx || 0) / 3)
+    );
+  }
+
+  // Reasons
   const reasons = [];
-  reasons.push(ema9 != null && ema21 != null ? (ema9 > ema21 ? "EMA Bullish" : "EMA Bearish") : "EMA N/A");
-  reasons.push(rsi != null ? `RSI ${rsi.toFixed(0)}` : "RSI N/A");
-  reasons.push(hist > 0 ? "MACD Positive" : "MACD Negative");
-  reasons.push(vwap != null ? (price > vwap ? "Above VWAP" : "Below VWAP") : "VWAP N/A");
-  reasons.push(volRatio > 1.1 ? "Volume High" : "Volume Normal");
-  if (pattern.name !== "None") reasons.push(`Candle: ${pattern.name}`);
+
+  reasons.push(
+    ema9 != null && ema21 != null
+      ? (ema9 > ema21 ? "EMA Bullish" : "EMA Bearish")
+      : "EMA N/A"
+  );
+
+  reasons.push(
+    rsi != null ? `RSI ${rsi.toFixed(0)}` : "RSI N/A"
+  );
+
+  reasons.push(
+    hist == null ? "MACD N/A" : (hist > 0 ? "MACD Positive" : "MACD Negative")
+  );
+
+  reasons.push(
+    vwap != null
+      ? (price > vwap ? "Above VWAP" : "Below VWAP")
+      : "VWAP N/A"
+  );
+
+  reasons.push(
+    volRatio > 1.1 ? "Volume High" : "Volume Normal"
+  );
+
+  if (pattern.name !== "None") {
+    reasons.push(`Candle: ${pattern.name}`);
+  }
 
   return {
     decision,
     bullish,
     wait: decision === "WAIT",
-confidence: Math.round(conf),
-    entryLow, entryHigh,
-    target1: t1, target2: t2, stoploss: sl,
-    riskReward: rr,
+
+    confidence: Math.round(confidence),
+
+    entryLow,
+    entryHigh,
+
+    target1,
+    target2,
+
+    stoploss,
+
+    riskReward,
     riskLevel,
     strength,
+
     reasons: reasons.join(" • "),
-    vwap, adx, support, resistance,
-pattern: pattern.name,
-price,
-predictionTime: Date.now()
-};
+
+    vwap,
+    adx,
+    support,
+    resistance,
+
+    pattern: pattern.name,
+
+    price,
+
+    predictionTime: Date.now()
+  };
 }
 
 // ---------- UI Update ----------
@@ -397,10 +539,10 @@ function updateUI(signal) {
   setText(els.trend, signal.wait ? "🟡 WAIT" : (signal.bullish ? "🟢 BULLISH" : "🔴 BEARISH"));
   setText(els.confidence, Math.round(signal.confidence) + "%");
 
-setText(els.entry, `${fmt(signal.entryLow)} - ${fmt(signal.entryHigh)}`);
-setText(els.target1, fmt(signal.target1));
-setText(els.target2, fmt(signal.target2));
-setText(els.stoploss, fmt(signal.stoploss));
+  setText(els.entry, `${fmt(signal.entryLow)} - ${fmt(signal.entryHigh)}`);
+  setText(els.target1, fmt(signal.target1));
+  setText(els.target2, fmt(signal.target2));
+  setText(els.stoploss, fmt(signal.stoploss));
 
   setOptionalText(els.aiReason, signal.reasons);
   setOptionalText(els.vwap, signal.vwap ? fmt(Math.round(signal.vwap)) : "--");
@@ -457,21 +599,25 @@ setText(els.stoploss, fmt(signal.stoploss));
     ).join("");
   }
 
-  // Notification
-  if (
-    (signal.decision === "BUY" || signal.decision === "SELL") &&
-    signal.decision !== lastAlertedDecision
-  ) {
-    playAlertSound();
+  // Notification (isolated — a throw here must NOT look like a data-load failure)
+  try {
+    if (
+      (signal.decision === "BUY" || signal.decision === "SELL") &&
+      signal.decision !== lastAlertedDecision
+    ) {
+      playAlertSound();
 
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification(`${SYMBOLS[currentSymbol].label} ${signal.decision}`, {
-        body: `Price: ${fmt(signal.price)}`
-      });
-    } 
-    else if ("Notification" in window && Notification.permission !== "denied") {
-      Notification.requestPermission();
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(`${SYMBOLS[currentSymbol].label} ${signal.decision}`, {
+          body: `Price: ${fmt(signal.price)}`
+        });
+      }
+      else if ("Notification" in window && Notification.permission !== "denied") {
+        Notification.requestPermission();
+      }
     }
+  } catch (notifErr) {
+    console.error("Notification error (ignored, does not affect data):", notifErr);
   }
 
   lastAlertedDecision =
@@ -480,25 +626,276 @@ setText(els.stoploss, fmt(signal.stoploss));
       : null;
 }
 
+let sharedAudioCtx = null;
+
 function playAlertSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    if (!sharedAudioCtx) {
+      sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (sharedAudioCtx.state === "suspended") {
+      sharedAudioCtx.resume();
+    }
+
+    const osc = sharedAudioCtx.createOscillator();
+    const gain = sharedAudioCtx.createGain();
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(sharedAudioCtx.destination);
 
     osc.frequency.value = 880;
     osc.type = "sine";
 
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.setValueAtTime(0.2, sharedAudioCtx.currentTime);
 
     osc.start();
-    osc.stop(ctx.currentTime + 0.3);
+    osc.stop(sharedAudioCtx.currentTime + 0.3);
 
   } catch (e) {}
-} 
+}
+
+// ============================================================
+// ---------- Demo Trading Account (Phase 1) ----------
+// ============================================================
+
+function loadDemoAccount() {
+  try {
+    const raw = localStorage.getItem(DEMO_STORAGE_KEY);
+    if (!raw) return;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Number.isFinite(parsed.balance)) {
+      console.warn("Saved demo account balance invalid — keeping fresh defaults.");
+      return;
+    }
+
+    // Only trust a saved position if every required field is a real, valid number
+    let safePosition = null;
+    const p = parsed.position;
+    if (
+      p &&
+      typeof p.symbol === "string" &&
+      (p.type === "BUY" || p.type === "SELL") &&
+      Number.isFinite(p.entryPrice) &&
+      Number.isFinite(p.qty) &&
+      p.qty > 0
+    ) {
+      safePosition = p;
+    } else if (p) {
+      console.warn("Saved open position was corrupted — discarding it (balance kept safe).");
+    }
+
+    // Drop any trade-history rows that aren't fully valid numbers
+    const safeHistory = Array.isArray(parsed.tradeHistory)
+      ? parsed.tradeHistory.filter(t =>
+          t &&
+          Number.isFinite(t.entryPrice) &&
+          Number.isFinite(t.exitPrice) &&
+          Number.isFinite(t.qty) &&
+          Number.isFinite(t.pl)
+        )
+      : [];
+
+    demoAccount = {
+      balance: parsed.balance,
+      position: safePosition,
+      tradeHistory: safeHistory
+    };
+  } catch (e) {
+    console.error("Failed to load demo account (using defaults):", e);
+  }
+}
+
+function saveDemoAccount() {
+  try {
+    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(demoAccount));
+  } catch (e) {
+    console.error("Failed to save demo account:", e);
+  }
+}
+
+// Maps a stored position's symbol label (e.g. "NIFTY 50") back to its
+// SYMBOLS key (e.g. "NIFTY"), so the app can resume on the correct
+// symbol after a reload if a demo position is already open.
+function symbolKeyFromLabel(label) {
+  for (const key in SYMBOLS) {
+    if (SYMBOLS[key].label === label) return key;
+  }
+  return null;
+}
+
+function openDemoPosition(type) {
+  if (demoAccount.position) {
+    alert("You already have an open position. Please EXIT it first.");
+    return;
+  }
+
+  if (currentLivePrice == null) {
+    alert("Waiting for live price. Please try again in a moment.");
+    return;
+  }
+
+  const rawQty = els.demoQty ? Number(els.demoQty.value) : 1;
+  if (!rawQty || rawQty <= 0 || !Number.isInteger(rawQty)) {
+    alert("Please enter a valid whole number quantity (minimum 1).");
+    return;
+  }
+  const qty = rawQty;
+
+  demoAccount.position = {
+    symbol: SYMBOLS[currentSymbol].label,
+    type: type,
+    entryPrice: currentLivePrice,
+    qty: qty,
+    entryTime: Date.now()
+  };
+
+  saveDemoAccount();
+  updateDemoUI();
+}
+
+function closeDemoPosition() {
+  const pos = demoAccount.position;
+  if (!pos) return;
+
+  if (currentLivePrice == null) {
+    alert("Waiting for live price. Please try again in a moment.");
+    return;
+  }
+
+  const exitPrice = currentLivePrice;
+  const pl = pos.type === "BUY"
+    ? (exitPrice - pos.entryPrice) * pos.qty
+    : (pos.entryPrice - exitPrice) * pos.qty;
+
+  demoAccount.balance += pl;
+
+  demoAccount.tradeHistory.unshift({
+    time: new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit"
+    }),
+    symbol: pos.symbol,
+    type: pos.type,
+    entryPrice: pos.entryPrice,
+    exitPrice: exitPrice,
+    qty: pos.qty,
+    pl: pl
+  });
+
+  // Cap history length to keep storage light
+  if (demoAccount.tradeHistory.length > 50) {
+    demoAccount.tradeHistory.length = 50;
+  }
+
+  demoAccount.position = null;
+
+  saveDemoAccount();
+  updateDemoUI();
+  renderTradeHistory();
+}
+
+function resetDemoAccount() {
+  const confirmed = window.confirm(
+    "Reset demo account? This will clear your virtual balance, any open position, and your full trade history."
+  );
+  if (!confirmed) return;
+
+  demoAccount = {
+    balance: DEMO_STARTING_BALANCE,
+    position: null,
+    tradeHistory: []
+  };
+
+  saveDemoAccount();
+  updateDemoUI();
+  renderTradeHistory();
+}
+
+function updateDemoUI() {
+  const pos = demoAccount.position;
+
+  const realizedPL = demoAccount.tradeHistory.reduce((sum, t) => sum + t.pl, 0);
+  let unrealizedPL = 0;
+
+  if (pos && currentLivePrice != null) {
+    unrealizedPL = pos.type === "BUY"
+      ? (currentLivePrice - pos.entryPrice) * pos.qty
+      : (pos.entryPrice - currentLivePrice) * pos.qty;
+  }
+
+  const totalPL = realizedPL + unrealizedPL;
+
+  setText(els.demoBalance, fmtMoney(demoAccount.balance));
+
+  if (els.demoTotalPL) {
+    els.demoTotalPL.textContent = fmtMoney(totalPL, true);
+    els.demoTotalPL.className = "balance-value " + plClass(totalPL);
+  }
+
+  if (pos) {
+    if (els.demoPositionBox) els.demoPositionBox.style.display = "block";
+
+    if (els.posType) {
+      els.posType.textContent = pos.type;
+      els.posType.className = "pos-type " + (pos.type === "BUY" ? "buy" : "sell");
+    }
+    setOptionalText(els.posSymbol, pos.symbol);
+    setOptionalText(els.posEntry, fmt(pos.entryPrice));
+    setOptionalText(els.posQty, pos.qty);
+    setOptionalText(els.posCurrent, currentLivePrice != null ? fmt(currentLivePrice) : "--");
+
+    if (els.posPL) {
+      els.posPL.textContent = fmtMoney(unrealizedPL, true);
+      els.posPL.className = plClass(unrealizedPL);
+    }
+
+    if (els.demoBuyBtn) els.demoBuyBtn.disabled = true;
+    if (els.demoSellBtn) els.demoSellBtn.disabled = true;
+    if (els.demoExitBtn) els.demoExitBtn.disabled = false;
+    if (els.demoQty) els.demoQty.disabled = true;
+  } else {
+    if (els.demoPositionBox) els.demoPositionBox.style.display = "none";
+
+    const priceReady = currentLivePrice != null;
+    if (els.demoBuyBtn) els.demoBuyBtn.disabled = !priceReady;
+    if (els.demoSellBtn) els.demoSellBtn.disabled = !priceReady;
+    if (els.demoExitBtn) els.demoExitBtn.disabled = true;
+    if (els.demoQty) els.demoQty.disabled = false;
+  }
+}
+
+function renderTradeHistory() {
+  if (!els.tradeHistoryList) return;
+
+  if (!demoAccount.tradeHistory.length) {
+    els.tradeHistoryList.innerHTML = '<div class="empty-history">No trades yet</div>';
+    return;
+  }
+
+  els.tradeHistoryList.innerHTML = demoAccount.tradeHistory.map(t => {
+    const cls = plClass(t.pl);
+    const sign = t.pl > 0 ? "+" : "";
+    return `
+      <div class="trade-row ${cls}">
+        <div class="trade-row-top">
+          <span class="trade-type ${t.type === "BUY" ? "buy" : "sell"}">${t.type}</span>
+          <span class="trade-symbol">${t.symbol}</span>
+          <span class="trade-time">${t.time}</span>
+        </div>
+        <div class="trade-row-bottom">
+          <span>Entry: ${fmt(t.entryPrice)}</span>
+          <span>Exit: ${fmt(t.exitPrice)}</span>
+          <span>Qty: ${t.qty}</span>
+          <span class="trade-pl ${cls}">${sign}${fmtMoney(t.pl)}</span>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
 
 // ---------- Fetch + Cycle ----------
 async function runCycle() {
@@ -509,14 +906,20 @@ async function runCycle() {
   els.errorState.style.display = "none";
   els.marketClosedMessage.style.display = "none";
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s safety timeout
+
   try {
 
-const yahooUrl = encodeURIComponent(getApiUrl());
+    const yahooUrl = encodeURIComponent(getApiUrl());
 
-const res = await fetch("https://corsproxy.io/?url=" + yahooUrl, {
-  method: "GET",
-  cache: "no-cache"
-});
+    const res = await fetch("https://corsproxy.io/?url=" + yahooUrl, {
+      method: "GET",
+      cache: "no-cache",
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
 
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
@@ -554,6 +957,7 @@ const res = await fetch("https://corsproxy.io/?url=" + yahooUrl, {
 
     lastGoodPrice = price;
     lastGoodCandles = candleHistory.slice();
+    currentLivePrice = price;
 
     setText(els.livePrice, fmt(price));
     setText(els.lastUpdated, new Date().toLocaleTimeString("en-IN", {
@@ -564,24 +968,26 @@ const res = await fetch("https://corsproxy.io/?url=" + yahooUrl, {
     const open = isMarketOpen();
     setText(els.marketStatus, open ? "Open" : "Closed");
 
-if (!open) {
-  els.loadingState.style.display = "none";
-  els.marketClosedMessage.style.display = "block";
-  
-  setText(els.trend, "🔒 Market Closed");
+    if (!open) {
+      els.loadingState.style.display = "none";
+      els.marketClosedMessage.style.display = "block";
 
-  // Show last available AI analysis
-if (candleHistory.length > 0) {
-    const lastSignal = computeSignal(candleHistory);
-    updateUI(lastSignal);
-  }
+      setText(els.trend, "🔒 Market Closed");
 
-  isLoading = false;
-  return;
-}
+      // Show last available AI analysis
+      if (candleHistory.length > 0) {
+        const lastSignal = computeSignal(candleHistory);
+        updateUI(lastSignal);
+      }
+
+      updateDemoUI();
+      isLoading = false;
+      return;
+    }
 
     if (candleHistory.length < 35) {
       setText(els.trend, "⏳ Loading Live Data...");
+      updateDemoUI();
       isLoading = false;
       els.loadingState.style.display = "none";
       return;
@@ -589,15 +995,21 @@ if (candleHistory.length > 0) {
 
     const signal = computeSignal(candleHistory);
     updateUI(signal);
+    updateDemoUI();
 
   } catch (err) {
+    clearTimeout(timeoutId);
     console.error(err);
     els.loadingState.style.display = "none";
     els.errorState.style.display = "block";
-    setText(els.errorText, "Could not load live data. " + (err.message || ""));
+    const msg = err.name === "AbortError"
+      ? "Request timed out after 12s. Will retry next cycle."
+      : "Could not load live data. " + (err.message || "");
+    setText(els.errorText, msg);
     if (lastGoodPrice != null) {
       setText(els.livePrice, fmt(lastGoodPrice) + " (last known)");
     }
+    updateDemoUI();
   }
 
   els.loadingState.style.display = "none";
@@ -625,7 +1037,7 @@ function loadTradingViewChart() {
       timezone: "Asia/Kolkata",
       theme: "dark",
       style: "1",
- locale: "in",
+      locale: "in",
       toolbar_bg: "#131722",
       enable_publishing: false,
       hide_top_toolbar: true,
@@ -642,6 +1054,13 @@ function loadTradingViewChart() {
 // ---------- Symbol Switch ----------
 document.querySelectorAll(".symbol-btn").forEach(btn => {
   btn.addEventListener("click", () => {
+    if (btn.dataset.symbol === currentSymbol) return;
+
+    if (demoAccount.position) {
+      alert("Please EXIT your current open demo position before switching symbol.");
+      return;
+    }
+
     document.querySelectorAll(".symbol-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     currentSymbol = btn.dataset.symbol;
@@ -659,12 +1078,15 @@ document.querySelectorAll(".symbol-btn").forEach(btn => {
     candleHistory = [];
     lastGoodCandles = [];
     lastGoodPrice = null;
+    currentLivePrice = null;
     predictionHistory = [];
     lastAlertedDecision = null;
+
     if (els.predictionHistory) {
       els.predictionHistory.innerHTML = '<div class="empty-history">No signals yet</div>';
     }
 
+    updateDemoUI();
     loadTradingViewChart();
 
     if (refreshTimer) clearInterval(refreshTimer);
@@ -684,9 +1106,39 @@ if (els.tvRetryBtn) {
   els.tvRetryBtn.addEventListener("click", loadTradingViewChart);
 }
 
+// ---------- Demo Trading Events ----------
+if (els.demoBuyBtn) {
+  els.demoBuyBtn.addEventListener("click", () => openDemoPosition("BUY"));
+}
+if (els.demoSellBtn) {
+  els.demoSellBtn.addEventListener("click", () => openDemoPosition("SELL"));
+}
+if (els.demoExitBtn) {
+  els.demoExitBtn.addEventListener("click", closeDemoPosition);
+}
+if (els.resetDemoBtn) {
+  els.resetDemoBtn.addEventListener("click", resetDemoAccount);
+}
+
 // ---------- Init ----------
 function init() {
+  loadDemoAccount();
+
+  // If a demo position is already open from a previous session, resume
+  // on that same symbol so live price and P&L stay correct.
+  if (demoAccount.position) {
+    const key = symbolKeyFromLabel(demoAccount.position.symbol);
+    if (key) currentSymbol = key;
+  }
+
+  document.querySelectorAll(".symbol-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.symbol === currentSymbol);
+  });
+
   setText(els.symbolLabel, SYMBOLS[currentSymbol].label);
+  updateDemoUI();
+  renderTradeHistory();
+
   loadTradingViewChart();
   runCycle();
   refreshTimer = setInterval(runCycle, 30000);
