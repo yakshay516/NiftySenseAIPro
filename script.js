@@ -24,9 +24,139 @@ let lastGoodCandles = [];
 let lastGoodPrice = null;
 let currentLivePrice = null;
 let predictionHistory = [];
+let aiLearningScore = 0;
+
+let aiStats = {
+  total: 0,
+  success: 0,
+  failed: 0
+};
+
+const AI_STATS_KEY = "niftysense_ai_stats_v1";
+
+function loadAIStats() {
+  try {
+    const saved = localStorage.getItem(AI_STATS_KEY);
+    if (!saved) return;
+
+    const data = JSON.parse(saved);
+
+    aiLearningScore = Number(data.aiLearningScore) || 0;
+
+    aiStats = {
+      total: Number(data.aiStats?.total) || 0,
+      success: Number(data.aiStats?.success) || 0,
+      failed: Number(data.aiStats?.failed) || 0
+    };
+
+  } catch (e) {
+    console.error("AI stats load failed:", e);
+  }
+}
+
+function saveAIStats() {
+  try {
+    localStorage.setItem(
+      AI_STATS_KEY,
+      JSON.stringify({
+        aiLearningScore,
+        aiStats
+      })
+    );
+  } catch (e) {
+    console.error("AI stats save failed:", e);
+  }
+}
+
 let lastAlertedDecision = null;
 let refreshTimer = null;
 let isLoading = false;
+
+// ---------- AI Prediction Review ----------
+function reviewPredictions() {
+  if (!predictionHistory.length || currentLivePrice == null) return;
+
+  const now = Date.now();
+
+  predictionHistory.forEach(item => {
+    if (item.reviewed) return;
+
+    // Review after 15 minutes
+    if ((now - item.reviewTime) < (15 * 60 * 1000)) return;
+
+    item.reviewed = true;
+
+    if (item.decision === "BUY") {
+
+      if (currentLivePrice >= item.target1) {
+        item.status = "Success";
+        item.result = "Target Hit";
+
+        aiLearningScore++;
+        aiStats.total++;
+        aiStats.success++;
+
+saveAIStats();
+
+      } else if (currentLivePrice <= item.stoploss) {
+        item.status = "Failed";
+        item.result = "Stop Loss Hit";
+
+        aiLearningScore--;
+        aiStats.total++;
+        aiStats.failed++;
+
+saveAIStats();
+
+      } else {
+        item.status = "Neutral";
+        item.result = "No Clear Result";
+      }
+
+    } else if (item.decision === "SELL") {
+
+      if (currentLivePrice <= item.target1) {
+        item.status = "Success";
+        item.result = "Target Hit";
+
+        aiLearningScore++;
+        aiStats.total++;
+        aiStats.success++;
+
+saveAIStats();
+
+      } else if (currentLivePrice >= item.stoploss) {
+        item.status = "Failed";
+        item.result = "Stop Loss Hit";
+
+        aiLearningScore--;
+        aiStats.total++;
+        aiStats.failed++;
+
+saveAIStats();
+
+      } else {
+        item.status = "Neutral";
+        item.result = "No Clear Result";
+      }
+
+    } else {
+
+      item.status = "Skipped";
+      item.result = "WAIT Signal";
+
+    }
+
+  });
+}
+
+function getAIAccuracy() {
+  if (aiStats.total === 0) return 0;
+
+  return Number(
+    ((aiStats.success / aiStats.total) * 100).toFixed(1)
+  );
+}
 
 // ---------- Demo Trading Account (Phase 1) ----------
 const DEMO_STORAGE_KEY = "niftysense_demo_account_v1";
@@ -48,6 +178,7 @@ const els = {
   predictionTime: document.getElementById("predictionTime"),
   trend: document.getElementById("trend"),
   confidence: document.getElementById("confidence"),
+aiAccuracy: document.getElementById("aiAccuracy"),
   entry: document.getElementById("entry"),
   target1: document.getElementById("target1"),
   target2: document.getElementById("target2"),
@@ -372,6 +503,13 @@ function computeSignal(candles) {
   if (pattern.bias === 1) buyScore += 10;
   else if (pattern.bias === -1) sellScore += 10;
 
+// Volume Confirmation
+if (volRatio != null) {
+  if (volRatio > 1.2) {
+    if (buyScore > sellScore) buyScore += 10;
+    else if (sellScore > buyScore) sellScore += 10;
+  }
+}
   // ---------- Final Decision (Phase 1: improved WAIT logic) ----------
   // WAIT should only appear when the market genuinely lacks a clear edge —
   // not just because one minor filter didn't align. Thresholds relaxed vs v1.0.
@@ -448,25 +586,43 @@ function computeSignal(candles) {
     else strength = "Strong";
   }
 
-  // Confidence
+    // Confidence (AI upgraded)
   let confidence;
+  let volumeBonus = 0;
+  let trendBonus = 0;
 
-  if (decision === "BUY") {
-    confidence = Math.min(
-      99,
-      buyScore + Math.max(0, (adx || 0) - 20) / 2
-    );
-  } else if (decision === "SELL") {
-    confidence = Math.min(
-      99,
-      sellScore + Math.max(0, (adx || 0) - 20) / 2
-    );
-  } else {
-    confidence = Math.min(
-      49,
-      20 + ((adx || 0) / 3)
-    );
+  if (volRatio != null && volRatio > 1.2) {
+    volumeBonus = 5;
   }
+
+  if (adx != null && adx >= 25) {
+    trendBonus = 5;
+  }
+
+if (decision === "BUY") {
+  confidence = Math.min(
+    99,
+    buyScore +
+    volumeBonus +
+    trendBonus +
+    Math.max(0, (adx || 0) - 20) / 2 +
+    (aiLearningScore * 0.5)
+  );
+} else if (decision === "SELL") {
+  confidence = Math.min(
+    99,
+    sellScore +
+    volumeBonus +
+    trendBonus +
+    Math.max(0, (adx || 0) - 20) / 2 +
+    (aiLearningScore * 0.5)
+  );
+} else {
+  confidence = Math.min(
+    49,
+    20 + ((adx || 0) / 3)
+  );
+}
 
   // Reasons
   const reasons = [];
@@ -482,7 +638,9 @@ function computeSignal(candles) {
   );
 
   reasons.push(
-    hist == null ? "MACD N/A" : (hist > 0 ? "MACD Positive" : "MACD Negative")
+    hist == null
+      ? "MACD N/A"
+      : (hist > 0 ? "MACD Positive" : "MACD Negative")
   );
 
   reasons.push(
@@ -498,8 +656,7 @@ function computeSignal(candles) {
   if (pattern.name !== "None") {
     reasons.push(`Candle: ${pattern.name}`);
   }
-
-  return {
+return {
     decision,
     bullish,
     wait: decision === "WAIT",
@@ -538,6 +695,7 @@ function updateUI(signal) {
 
   setText(els.trend, signal.wait ? "🟡 WAIT" : (signal.bullish ? "🟢 BULLISH" : "🔴 BEARISH"));
   setText(els.confidence, Math.round(signal.confidence) + "%");
+setText(els.aiAccuracy, getAIAccuracy() + "%");
 
   setText(els.entry, `${fmt(signal.entryLow)} - ${fmt(signal.entryHigh)}`);
   setText(els.target1, fmt(signal.target1));
@@ -581,23 +739,41 @@ function updateUI(signal) {
     lastEntry.price === signal.price;
 
   if (!isDuplicate) {
-    predictionHistory.unshift({
-      time: timeStr,
-      symbol: SYMBOLS[currentSymbol].label,
-      decision: signal.decision,
-      price: signal.price
-    });
+   predictionHistory.unshift({
+  time: timeStr,
+  symbol: SYMBOLS[currentSymbol].label,
+  decision: signal.decision,
+  price: signal.price,
+
+  confidence: signal.confidence,
+  target1: signal.target1,
+  target2: signal.target2,
+  stoploss: signal.stoploss,
+
+  status: "Pending",
+  reviewed: false,
+reviewTime: Date.now(),
+result: null
+});
 
     if (predictionHistory.length > 5) {
       predictionHistory.pop();
     }
   }
 
-  if (els.predictionHistory) {
-    els.predictionHistory.innerHTML = predictionHistory.map(item =>
-      `<div>${item.time} • ${item.symbol}: ${item.decision} @ ${fmt(item.price)}</div>`
-    ).join("");
-  }
+if (els.predictionHistory) {
+  els.predictionHistory.innerHTML = predictionHistory.map(item => `
+    <div class="prediction-item">
+      <strong>${item.time}</strong> • ${item.symbol}<br>
+      ${item.decision} @ ${fmt(item.price)}<br>
+      Status: <b>${item.status}</b> |
+      Confidence: ${item.confidence}%<br>
+Result: ${item.result || "--"}<br>
+      T1: ${fmt(item.target1)} |
+      SL: ${fmt(item.stoploss)}
+    </div>
+  `).join("");
+}
 
   // Notification (isolated — a throw here must NOT look like a data-load failure)
   try {
@@ -624,34 +800,77 @@ function updateUI(signal) {
     (signal.decision === "BUY" || signal.decision === "SELL")
       ? signal.decision
       : null;
+
+reviewPredictions();
 }
 
-let sharedAudioCtx = null;
+// ---------- AI Prediction Review ----------
+function reviewPredictions() {
+  if (!predictionHistory.length || currentLivePrice == null) return;
 
-function playAlertSound() {
-  try {
-    if (!sharedAudioCtx) {
-      sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const now = Date.now();
+
+  predictionHistory.forEach(item => {
+    if (item.reviewed) return;
+
+    // Review after 15 minutes
+    if ((now - item.reviewTime) < (15 * 60 * 1000)) return;
+
+    item.reviewed = true;
+
+    if (item.decision === "BUY") {
+
+      if (currentLivePrice >= item.target1) {
+        item.status = "Success";
+        item.result = "Target Hit";
+
+        aiLearningScore++;
+        aiStats.total++;
+        aiStats.success++;
+
+      } else if (currentLivePrice <= item.stoploss) {
+        item.status = "Failed";
+        item.result = "Stop Loss Hit";
+
+        aiLearningScore--;
+        aiStats.total++;
+        aiStats.failed++;
+
+      } else {
+        item.status = "Neutral";
+        item.result = "No Clear Result";
+      }
+
+    } else if (item.decision === "SELL") {
+
+      if (currentLivePrice <= item.target1) {
+        item.status = "Success";
+        item.result = "Target Hit";
+
+        aiLearningScore++;
+        aiStats.total++;
+        aiStats.success++;
+
+      } else if (currentLivePrice >= item.stoploss) {
+        item.status = "Failed";
+        item.result = "Stop Loss Hit";
+
+        aiLearningScore--;
+        aiStats.total++;
+        aiStats.failed++;
+
+      } else {
+        item.status = "Neutral";
+        item.result = "No Clear Result";
+      }
+
+    } else {
+
+      item.status = "Skipped";
+      item.result = "WAIT Signal";
+
     }
-    if (sharedAudioCtx.state === "suspended") {
-      sharedAudioCtx.resume();
-    }
-
-    const osc = sharedAudioCtx.createOscillator();
-    const gain = sharedAudioCtx.createGain();
-
-    osc.connect(gain);
-    gain.connect(sharedAudioCtx.destination);
-
-    osc.frequency.value = 880;
-    osc.type = "sine";
-
-    gain.gain.setValueAtTime(0.2, sharedAudioCtx.currentTime);
-
-    osc.start();
-    osc.stop(sharedAudioCtx.currentTime + 0.3);
-
-  } catch (e) {}
+  });
 }
 
 // ============================================================
@@ -1122,6 +1341,7 @@ if (els.resetDemoBtn) {
 
 // ---------- Init ----------
 function init() {
+loadAIStats();
   loadDemoAccount();
 
   // If a demo position is already open from a previous session, resume
