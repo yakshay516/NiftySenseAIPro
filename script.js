@@ -519,10 +519,19 @@ if (volRatio != null) {
   // If ADX is unavailable yet (early data), don't force WAIT purely on that.
   const adxOk = adx == null || adx >= 10;
 
-  if (adxOk) {
-    if (buyScore >= 55) decision = "BUY";
-    else if (sellScore >= 55) decision = "SELL";
+if (adxOk) {
+
+  const scoreGap = Math.abs(buyScore - sellScore);
+
+  if (buyScore >= 55 && buyScore > sellScore && scoreGap >= 10) {
+    decision = "BUY";
+  } else if (sellScore >= 55 && sellScore > buyScore && scoreGap >= 10) {
+    decision = "SELL";
+  } else {
+    decision = "WAIT";
   }
+
+}
 
   // Support / Resistance Filter — avoid entries right against a wall.
   // Buffer tightened (was 0.5x ATR, now 0.3x) so it only blocks true edge cases.
@@ -606,7 +615,7 @@ if (decision === "BUY") {
     volumeBonus +
     trendBonus +
     Math.max(0, (adx || 0) - 20) / 2 +
-    (aiLearningScore * 0.5)
+Math.min(10, Math.max(-10, aiLearningScore * 0.5))
   );
 } else if (decision === "SELL") {
   confidence = Math.min(
@@ -615,7 +624,7 @@ if (decision === "BUY") {
     volumeBonus +
     trendBonus +
     Math.max(0, (adx || 0) - 20) / 2 +
-    (aiLearningScore * 0.5)
+Math.min(10, Math.max(-10, aiLearningScore * 0.5))
   );
 } else {
   confidence = Math.min(
@@ -802,75 +811,6 @@ Result: ${item.result || "--"}<br>
       : null;
 
 reviewPredictions();
-}
-
-// ---------- AI Prediction Review ----------
-function reviewPredictions() {
-  if (!predictionHistory.length || currentLivePrice == null) return;
-
-  const now = Date.now();
-
-  predictionHistory.forEach(item => {
-    if (item.reviewed) return;
-
-    // Review after 15 minutes
-    if ((now - item.reviewTime) < (15 * 60 * 1000)) return;
-
-    item.reviewed = true;
-
-    if (item.decision === "BUY") {
-
-      if (currentLivePrice >= item.target1) {
-        item.status = "Success";
-        item.result = "Target Hit";
-
-        aiLearningScore++;
-        aiStats.total++;
-        aiStats.success++;
-
-      } else if (currentLivePrice <= item.stoploss) {
-        item.status = "Failed";
-        item.result = "Stop Loss Hit";
-
-        aiLearningScore--;
-        aiStats.total++;
-        aiStats.failed++;
-
-      } else {
-        item.status = "Neutral";
-        item.result = "No Clear Result";
-      }
-
-    } else if (item.decision === "SELL") {
-
-      if (currentLivePrice <= item.target1) {
-        item.status = "Success";
-        item.result = "Target Hit";
-
-        aiLearningScore++;
-        aiStats.total++;
-        aiStats.success++;
-
-      } else if (currentLivePrice >= item.stoploss) {
-        item.status = "Failed";
-        item.result = "Stop Loss Hit";
-
-        aiLearningScore--;
-        aiStats.total++;
-        aiStats.failed++;
-
-      } else {
-        item.status = "Neutral";
-        item.result = "No Clear Result";
-      }
-
-    } else {
-
-      item.status = "Skipped";
-      item.result = "WAIT Signal";
-
-    }
-  });
 }
 
 // ============================================================
@@ -1125,6 +1065,20 @@ async function runCycle() {
   els.errorState.style.display = "none";
   els.marketClosedMessage.style.display = "none";
 
+  if (!isMarketOpen()) {
+    els.loadingState.style.display = "none";
+    els.marketClosedMessage.style.display = "block";
+    setText(els.marketStatus, "Closed");
+
+    if (candleHistory.length > 0) {
+      updateUI(computeSignal(candleHistory));
+    }
+
+    updateDemoUI();
+    isLoading = false;
+    return;
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s safety timeout
 
@@ -1132,11 +1086,31 @@ async function runCycle() {
 
     const yahooUrl = encodeURIComponent(getApiUrl());
 
-    const res = await fetch("https://corsproxy.io/?url=" + yahooUrl, {
+const proxies = [
+  "https://corsproxy.io/?url=",
+  "https://api.allorigins.win/raw?url="
+];
+
+let res = null;
+let lastError = null;
+
+for (const proxy of proxies) {
+  try {
+    res = await fetch(proxy + yahooUrl, {
       method: "GET",
       cache: "no-cache",
       signal: controller.signal
     });
+
+    if (res.ok) break;
+  } catch (e) {
+    lastError = e;
+  }
+}
+
+if (!res || !res.ok) {
+  throw lastError || new Error("All proxies failed");
+}
 
     clearTimeout(timeoutId);
 
