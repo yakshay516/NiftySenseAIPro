@@ -8,7 +8,7 @@
 const SYMBOLS = {
   SENSEX: {
     yahooCode: "%5EBSESN",
-    tvSymbol: "BSE:SENSEX",
+    tvSymbol: "INDEX:SENSEX",
     label: "SENSEX"
   },
   NIFTY: {
